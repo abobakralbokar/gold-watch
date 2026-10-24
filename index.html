@@ -349,7 +349,7 @@ async function bootArtifact(){
   const sub=(path,fn)=>db.doc(path).onSnapshot(s=>{if(s.exists){try{fn(s.data())}catch(e){console.error(e)}}},err=>console.warn(path,err));
   sub('prices/latest',d=>{if(d.oz)setSpot(Number(d.oz),d.at||new Date().toISOString(),d.source||'الفحص التلقائي',true)});
   sub('prices/intraday',d=>{if(Array.isArray(d.points)){state.intraday=d.points.map(p=>({t:(p.t>2e10?p.t:p.t*1000),p:p.p}));renderChart()}});
-  sub('prices/daily',d=>{if(Array.isArray(d.days)){state.daily=d.days.slice().sort((a,b)=>a.d<b.d?-1:1);renderAll()}});
+  sub('prices/daily',d=>{if(Array.isArray(d.days)){state.daily=d.days.slice().sort((a,b)=>a.d<b.d?-1:1);state.dailyNote=d.note||'';renderAll()}});
   sub('config/fx',d=>{if(d.sanaa&&d.aden){state.fx=d;renderAll()}});
   sub('config/forecast',d=>{if(d.scenarios){state.forecast=d;renderAll()}});
   sub('status/monitor',d=>{state.monitor=d;renderMonitor()});
@@ -544,7 +544,7 @@ function renderChart(){
   const xh={id:'xh',afterDraw(c){const a=c.tooltip&&c.tooltip.getActiveElements?c.tooltip.getActiveElements():[];if(!a.length)return;const x=a[0].element.x,{top,bottom}=c.chartArea,ctx=c.ctx;ctx.save();ctx.strokeStyle=fg2;ctx.setLineDash([3,3]);ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(x,top);ctx.lineTo(x,bottom);ctx.stroke();ctx.restore()}};
   if(chart){chart.data.datasets=ds;chart.options=cfg.options;chart.update('none')}else{cfg.plugins=[xh];chart=new Chart($('#chart').getContext('2d'),cfg)}
   $('#legend').innerHTML=`<span><i style="background:${gold}"></i>السعر</span>`+legend.join('');
-  $('#chartNote').textContent=kind==='intraday'?(state.range==='day'?'لحظي: عينات كل 5 دقائق من المصدر + عينات اللوحة كل 30 ثانية.':'عينات 5 دقائق — أسبوعان.'):(state.range==='week'?'إغلاقات يومية + السعر الحالي. النطاقات المظللة: توقعات حتى نهاية الأفق.':'إغلاقات يومية. النطاقات المظللة على اليمين: سيناريوهات التوقعات (مخطط = هابط/صاعد).');
+  $('#chartNote').textContent=(kind==='intraday'?(state.range==='day'?'لحظي: عينات كل 5 دقائق من المصدر + عينات اللوحة كل 30 ثانية.':'عينات 5 دقائق — أسبوعان.'):(state.range==='week'?'إغلاقات يومية + السعر الحالي. النطاقات المظللة: توقعات حتى نهاية الأفق.':'إغلاقات يومية. النطاقات المظللة على اليمين: سيناريوهات التوقعات (مخطط = هابط/صاعد).'))+(kind==='daily'&&state.dailyNote?' · '+state.dailyNote:'');
 }
 function renderFallback(box,pts){let svg=box.querySelector('svg');if(!svg){box.innerHTML='<svg class="fallback" viewBox="0 0 600 260" preserveAspectRatio="none"></svg>';svg=box.querySelector('svg')}
   const ys=pts.map(p=>p.y),mn=Math.min(...ys),mx=Math.max(...ys),r=(mx-mn)||1;const d=pts.map((p,i)=>(i?'L':'M')+(i/(pts.length-1)*600).toFixed(1)+','+(250-(p.y-mn)/r*230).toFixed(1)).join(' ');
