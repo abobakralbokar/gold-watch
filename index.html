@@ -224,17 +224,22 @@ footer a{color:var(--fg2)}
 
     <section class="panel">
       <h2>السعودية <span class="meta">ريال/جرام · الريال مربوط بالدولار 3.75</span></h2>
-      <div class="tablewrap"><table id="ksaTbl">
-        <thead><tr><th>العيار</th><th>الجرام</th><th>التغير</th></tr></thead>
-        <tbody>
-          <tr data-k="24"><td class="k">24</td><td class="v num">—</td><td class="c num">—</td></tr>
-          <tr data-k="22"><td class="k">22</td><td class="v num">—</td><td class="c num">—</td></tr>
-          <tr data-k="21" class="hi"><td class="k">21</td><td class="v num">—</td><td class="c num">—</td></tr>
-          <tr data-k="18"><td class="k">18</td><td class="v num">—</td><td class="c num">—</td></tr>
-          <tr data-k="pound"><td class="k">الجنيه (8ج عيار 21)</td><td class="v num">—</td><td class="c num">—</td></tr>
-        </tbody>
-      </table></div>
-      <p class="small muted" style="margin:10px 0 0">المحلات تضيف مصنعية 10–40 ريال/جرام على المشغولات؛ السبائك الأقرب لهذا السعر.</p>
+      <div class="city" id="city-ksa">
+        <div class="head"><div class="n">السعودية<span class="cur">ريال سعودي · بدون مصنعية</span></div><button class="ghost" id="ksaEdit">تعديل</button></div>
+        <div class="fx" id="ksaFx"></div>
+        <div class="tablewrap"><table id="ksaTbl">
+          <thead><tr><th>العيار</th><th>بيع المحل لك</th><th>شراء المحل منك</th><th>التغير</th></tr></thead>
+          <tbody>
+            <tr data-k="24"><td class="k">24</td><td class="v num">—</td><td class="b num">—</td><td class="c num">—</td></tr>
+            <tr data-k="22"><td class="k">22</td><td class="v num">—</td><td class="b num">—</td><td class="c num">—</td></tr>
+            <tr data-k="21" class="hi"><td class="k">21</td><td class="v num">—</td><td class="b num">—</td><td class="c num">—</td></tr>
+            <tr data-k="18"><td class="k">18</td><td class="v num">—</td><td class="b num">—</td><td class="c num">—</td></tr>
+            <tr data-k="pound"><td class="k">الجنيه (8ج)</td><td class="v num">—</td><td class="b num">—</td><td class="c num">—</td></tr>
+          </tbody>
+        </table></div>
+        <div class="fxform" id="fxform-ksa" hidden></div>
+      </div>
+      <p class="small muted" style="margin:10px 0 0">السعر العالمي (السبائك) لعيار 21 الآن: <b class="num" id="ksaSpot">—</b>. المشغولات يُضاف عليها مصنعية 10–40 ريال/جرام فوق "بيع المحل لك". الفارق تقديري حسب متوسط السوق؛ عدّله من "تعديل" ليطابق محلك.</p>
     </section>
 
     <section class="panel">
@@ -360,6 +365,7 @@ async function fetchConfig(){
   const q='?v='+Date.now();
   try{const fx=await getJSON('data/fx.json'+q);if(fx&&fx.sanaa&&fx.aden){state.fx=fx}}catch(e){}
   try{const fc=await getJSON('data/forecast.json'+q);if(fc&&fc.scenarios){state.forecast=fc}}catch(e){}
+  try{const k=await getJSON('data/ksa.json'+q);if(k&&isFinite(k.sellPremium))state.ksa=k}catch(e){}
   try{const m=await getJSON('data/monitor.json'+q);if(m)state.monitor=m}catch(e){}
   try{const a=await getJSON('data/alerts.json'+q);if(a&&Array.isArray(a.items))state.alerts=a.items}catch(e){}
   renderAll();checkRemoteAlerts();
@@ -375,6 +381,7 @@ async function bootArtifact(){
   sub('prices/daily',d=>{if(Array.isArray(d.days)){state.daily=d.days.slice().sort((a,b)=>a.d<b.d?-1:1);state.dailyNote=d.note||'';renderAll()}});
   sub('config/fx',d=>{if(d.sanaa&&d.aden){state.fx=d;renderAll()}});
   sub('config/forecast',d=>{if(d.scenarios){state.forecast=d;renderAll()}});
+  sub('config/ksa',d=>{if(d&&isFinite(d.sellPremium)){state.ksa=d;renderKSA()}});
   sub('status/monitor',d=>{state.monitor=d;renderMonitor()});
   sub('alerts/log',d=>{if(Array.isArray(d.items)){state.alerts=d.items;renderMonitor();checkRemoteAlerts()}});
   sub('config/meta',d=>{state.meta=d||{};renderMonitor()});
@@ -450,10 +457,35 @@ function renderHero(){
   $('#staleTxt').textContent=state.fresh?'':'· آخر سعر محفوظ في المصدر';
 }
 function setChg(sel,p){const el=$(sel);el.textContent=fmtPct(p);el.className='num '+(p>0?'up':p<0?'down':'flat')}
+const DEFAULT_KSA={sellPremium:0.005,buyPremium:-0.02,note:'تقدير متوسط السوق السعودي'};
+state.ksa=DEFAULT_KSA;state.ksaLocal=ls.get('gw_ksaLocal',null);
+function ksaNow(){return state.ksaLocal||state.ksa}
+function ksaPrice(oz,k,side){const f=ksaNow();const base=k==='pound'?sarG(oz,21)*8:sarG(oz,k);return base*(1+(side==='buy'?(f.buyPremium||0):(f.sellPremium||0)))}
 function renderKSA(){
+  const f=ksaNow();
+  $('#ksaFx').innerHTML=`<span>فارق بيع المحل <b class="num">%${((f.sellPremium||0)*100).toFixed(1)}</b></span><span>فارق شراء المحل <b class="num">%${((f.buyPremium||0)*100).toFixed(1)}</b></span><span>${state.ksaLocal?'تعديل محلي':'تقديري'}</span>`;
   const oz=state.oz;if(oz==null)return;const rc=refClose();
-  $$('#ksaTbl tbody tr').forEach(tr=>{const k=tr.dataset.k;const now=k==='pound'?sarG(oz,21)*8:sarG(oz,k);tr.querySelector('.v').textContent=fmtN(now,k==='pound'?0:1);
-    const c=tr.querySelector('.c');if(rc.ref){const was=k==='pound'?sarG(rc.ref,21)*8:sarG(rc.ref,k);const d=now-was;c.textContent=fmtSigned(d,k==='pound'?0:1);c.className='c num '+(d>0.005?'up':d<-0.005?'down':'flat')}else{c.textContent='—';c.className='c num flat'}})}
+  $('#ksaSpot').textContent=fmtN(sarG(oz,21),1)+' ريال';
+  $$('#ksaTbl tbody tr').forEach(tr=>{const k=tr.dataset.k,dec=k==='pound'?0:1;const now=ksaPrice(oz,k,'sell');
+    tr.querySelector('.v').textContent=fmtN(now,dec);tr.querySelector('.b').textContent=fmtN(ksaPrice(oz,k,'buy'),dec);
+    const c=tr.querySelector('.c');if(rc.ref){const d=now-ksaPrice(rc.ref,k,'sell');c.textContent=fmtSigned(d,dec);c.className='c num '+(d>0.005?'up':d<-0.005?'down':'flat')}else{c.textContent='—';c.className='c num flat'}})}
+function openKsaForm(){
+  const f=ksaNow();const form=$('#fxform-ksa');if(!form.hidden){form.hidden=true;return}
+  form.innerHTML=`<label>فارق بيع المحل % <input type="number" step="0.1" id="ksa-sp" value="${((f.sellPremium||0)*100).toFixed(1)}"></label>
+    <label>فارق شراء المحل % (سالب) <input type="number" step="0.1" id="ksa-bp" value="${((f.buyPremium||0)*100).toFixed(1)}"></label>
+    <div class="row"><span class="small muted">مثال: إذا محلك يشتري عيار 21 بـ 5 ريال أقل من السعر العالمي فالفارق ≈ %-1.2</span><span><button class="ghost" data-cancel>إلغاء</button> <button class="primary" data-save>حفظ</button></span></div>
+    ${(!IN_ARTIFACT&&state.ksaLocal)?'<div style="grid-column:1/-1"><button class="ghost" data-reset>إعادة التقديري</button></div>':''}`;
+  form.hidden=false;
+  form.querySelector('[data-cancel]').onclick=()=>{form.hidden=true};
+  const rs=form.querySelector('[data-reset]');if(rs)rs.onclick=()=>{state.ksaLocal=null;ls.set('gw_ksaLocal',null);form.hidden=true;renderKSA();toast('رجعنا للفارق التقديري')};
+  form.querySelector('[data-save]').onclick=async()=>{
+    const sp=Number($('#ksa-sp').value)/100,bp=Number($('#ksa-bp').value)/100;
+    if(!isFinite(sp)||!isFinite(bp)||sp<-0.1||sp>0.2||bp<-0.2||bp>0.05){toast('الفارق غير منطقي');return}
+    const next={sellPremium:sp,buyPremium:bp,updatedAt:new Date().toISOString(),note:'تعديل يدوي من اللوحة'};
+    if(IN_ARTIFACT&&db){try{await db.doc('config/ksa').set(next);toast('حُفظ في اللوحة')}catch(e){toast('تعذّر الحفظ');return}}
+    else{state.ksaLocal=next;ls.set('gw_ksaLocal',next)}
+    form.hidden=true;renderKSA()}}
+$('#ksaEdit').addEventListener('click',openKsaForm);
 function renderYemen(){
   const fx=fxNow();const meta=$('#fxMeta');
   meta.textContent=(state.fxLocal?'تعديل محلي على هذا الجهاز · ':'')+'صرف محدّث '+(fx.updatedAt?fDateTime.format(new Date(fx.updatedAt)):'—');
