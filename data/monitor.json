@@ -1,7 +1,9 @@
 {
-  "lastCheckAt": null,
-  "ozAtCheck": null,
-  "sar21AtCheck": null,
-  "result": "الفحص التلقائي لم يبدأ بعد — يعمل كل ساعة من الاثنين إلى الجمعة",
-  "nextCheckHint": "كل ساعة (الاثنين–الجمعة)"
+  "lastCheckAt": "2026-11-02T09:13:58Z",
+  "ozAtCheck": 3902.5,
+  "sar21AtCheck": 411.7,
+  "sar24AtCheck": 470.5,
+  "result": "تنبيه: كسر تحت 416 ريال — قاع السنة (الآن 411.7)",
+  "nextCheckHint": "كل ساعة (الاثنين–الجمعة)",
+  "source": "xaus.com"
 }
